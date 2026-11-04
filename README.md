@@ -17,8 +17,8 @@ O serviço usa o **mesmo banco Oracle da API .NET e do app mobile do PetCare360*
 
 ## Links
 
-- Vídeo pitch (YouTube, não listado): _adicionar link_
-- Repositório: _adicionar link_
+- Vídeo pitch (YouTube, não listado): https://youtu.be/BAtsY6Csq0E
+- Repositório: https://github.com/MurilloFernandesCarapia/petcare360-sprint4-iot
 
 ## Problema e solução de IA
 
@@ -79,7 +79,6 @@ PetCare360_Sprint4/
 ├── docs/
 │   ├── ARQUITETURA.md
 │   ├── COMPONENTE_IA.md
-│   ├── ROTEIRO_PITCH.md
 │   └── evidencias/
 └── README.md
 ```
