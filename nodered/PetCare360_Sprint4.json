@@ -1,0 +1,1172 @@
+[
+  {
+    "id": "tab_petcare360",
+    "type": "tab",
+    "label": "PetCare360 - Sprint 4",
+    "disabled": false,
+    "info": "PetCare360 / CLYVO VET - Sprint 4: IoT (MQTT) + API REST + serviço de IA (Random Forest + IRP) + Oracle."
+  },
+  {
+    "id": "mqtt_hive",
+    "type": "mqtt-broker",
+    "name": "HiveMQ Public",
+    "broker": "broker.hivemq.com",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "ui_tab_petcare",
+    "type": "ui_tab",
+    "name": "PetCare360",
+    "icon": "dashboard",
+    "disabled": false,
+    "hidden": false
+  },
+  {
+    "id": "ui_group_form",
+    "type": "ui_group",
+    "name": "Avaliação manual do pet",
+    "tab": "ui_tab_petcare",
+    "order": 1,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "ui_group_sim",
+    "type": "ui_group",
+    "name": "Simulador IoT (coleira)",
+    "tab": "ui_tab_petcare",
+    "order": 2,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "ui_group_monitor",
+    "type": "ui_group",
+    "name": "Sinais monitorados",
+    "tab": "ui_tab_petcare",
+    "order": 3,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "ui_group_ia",
+    "type": "ui_group",
+    "name": "Análise da IA",
+    "tab": "ui_tab_petcare",
+    "order": 4,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "ui_group_hist",
+    "type": "ui_group",
+    "name": "Acompanhamento contínuo",
+    "tab": "ui_tab_petcare",
+    "order": 5,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "http_in_ia",
+    "type": "http in",
+    "z": "tab_petcare360",
+    "name": "POST /api/ia/analisar",
+    "url": "/api/ia/analisar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 150,
+    "y": 80,
+    "wires": [
+      [
+        "fn_api_normalize"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_normalize",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "API - normalizar entrada",
+    "func": "let corpo = msg.payload;\nif (typeof corpo === \"string\") {\n    try { corpo = JSON.parse(corpo); } catch (e) { corpo = {}; }\n}\ncorpo = corpo || {};\ncorpo.origem = corpo.origem || \"api\";\nmsg.payload = corpo;\nmsg._origApi = true;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 380,
+    "y": 80,
+    "wires": [
+      [
+        "fn_rf_config"
+      ]
+    ]
+  },
+  {
+    "id": "mqtt_in",
+    "type": "mqtt in",
+    "z": "tab_petcare360",
+    "name": "MQTT - telemetria da coleira",
+    "topic": "petcare360/sprint4/telemetria",
+    "qos": "1",
+    "datatype": "auto-detect",
+    "broker": "mqtt_hive",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 160,
+    "wires": [
+      [
+        "json_parse"
+      ]
+    ]
+  },
+  {
+    "id": "json_parse",
+    "type": "json",
+    "z": "tab_petcare360",
+    "name": "JSON",
+    "property": "payload",
+    "action": "obj",
+    "pretty": false,
+    "x": 370,
+    "y": 160,
+    "wires": [
+      [
+        "fn_rf_config"
+      ]
+    ]
+  },
+  {
+    "id": "fn_rf_config",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "Montar chamada ao serviço de IA",
+    "func": "const base = env.get(\"PETCARE360_AI_BASE_URL\") || \"http://127.0.0.1:8000\";\nmsg.url = `${base}/api/ia/analisar`;\nmsg.method = \"POST\";\nmsg.headers = { \"content-type\": \"application/json\" };\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 620,
+    "y": 120,
+    "wires": [
+      [
+        "http_rf_service"
+      ]
+    ]
+  },
+  {
+    "id": "http_rf_service",
+    "type": "http request",
+    "z": "tab_petcare360",
+    "name": "Serviço de IA (Python)",
+    "method": "use",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 860,
+    "y": 120,
+    "wires": [
+      [
+        "fn_rf_result"
+      ]
+    ]
+  },
+  {
+    "id": "fn_rf_result",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "Validar resposta da IA",
+    "func": "const ok = msg.statusCode >= 200 && msg.statusCode < 300 && msg.payload && msg.payload.analiseIA;\nif (ok) {\n    return [msg, null];\n}\nconst status = Number(msg.statusCode);\nmsg.payload = { erro: \"Falha ao consultar o serviço de IA\", status: status || null, detalhe: msg.payload || null };\nmsg.statusCode = status >= 400 && status < 500 ? status : 502;\nreturn [null, msg];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1080,
+    "y": 120,
+    "wires": [
+      [
+        "fn_api_result",
+        "fn_dashboard",
+        "fn_alert",
+        "fn_hist_request",
+        "debug_ia"
+      ],
+      [
+        "fn_api_result",
+        "debug_erro"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_result",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "API - formatar resposta",
+    "func": "if (!msg._origApi) {\n    return null;\n}\nmsg.headers = { \"content-type\": \"application/json; charset=utf-8\" };\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1330,
+    "y": 60,
+    "wires": [
+      [
+        "http_response_ia"
+      ]
+    ]
+  },
+  {
+    "id": "http_response_ia",
+    "type": "http response",
+    "z": "tab_petcare360",
+    "name": "Resposta API",
+    "statusCode": "",
+    "headers": {},
+    "x": 1540,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "debug_ia",
+    "type": "debug",
+    "z": "tab_petcare360",
+    "name": "Resultado IA",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1310,
+    "y": 180,
+    "wires": []
+  },
+  {
+    "id": "debug_erro",
+    "type": "debug",
+    "z": "tab_petcare360",
+    "name": "Erro IA",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1300,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "btn_sim_normal",
+    "type": "ui_button",
+    "z": "tab_petcare360",
+    "name": "Normal",
+    "group": "ui_group_sim",
+    "order": 1,
+    "width": 2,
+    "height": 1,
+    "passthru": false,
+    "label": "Normal",
+    "tooltip": "",
+    "color": "",
+    "bgcolor": "",
+    "className": "",
+    "icon": "",
+    "payload": "normal",
+    "payloadType": "str",
+    "topic": "",
+    "topicType": "str",
+    "x": 140,
+    "y": 300,
+    "wires": [
+      [
+        "fn_simulator"
+      ]
+    ]
+  },
+  {
+    "id": "btn_sim_atencao",
+    "type": "ui_button",
+    "z": "tab_petcare360",
+    "name": "Atenção",
+    "group": "ui_group_sim",
+    "order": 2,
+    "width": 2,
+    "height": 1,
+    "passthru": false,
+    "label": "Atenção",
+    "tooltip": "",
+    "color": "",
+    "bgcolor": "",
+    "className": "",
+    "icon": "",
+    "payload": "atencao",
+    "payloadType": "str",
+    "topic": "",
+    "topicType": "str",
+    "x": 140,
+    "y": 340,
+    "wires": [
+      [
+        "fn_simulator"
+      ]
+    ]
+  },
+  {
+    "id": "btn_sim_alto",
+    "type": "ui_button",
+    "z": "tab_petcare360",
+    "name": "Alto",
+    "group": "ui_group_sim",
+    "order": 3,
+    "width": 2,
+    "height": 1,
+    "passthru": false,
+    "label": "Alto",
+    "tooltip": "",
+    "color": "",
+    "bgcolor": "",
+    "className": "",
+    "icon": "",
+    "payload": "alto",
+    "payloadType": "str",
+    "topic": "",
+    "topicType": "str",
+    "x": 140,
+    "y": 380,
+    "wires": [
+      [
+        "fn_simulator"
+      ]
+    ]
+  },
+  {
+    "id": "fn_simulator",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "Simulador IoT (coleira)",
+    "func": "const cenarios = {\n    normal: { temperatura: 38.3, umidade: 55, amplitude: 0.68, alimentacao: 90, comportamento: \"Normal\" },\n    atencao: { temperatura: 39.3, umidade: 68, amplitude: 0.36, alimentacao: 50, comportamento: \"Alterado\" },\n    alto: { temperatura: 39.8, umidade: 72, amplitude: 0.19, alimentacao: 35, comportamento: \"Alterado\" }\n};\nconst c = cenarios[msg.payload] || cenarios.normal;\nconst ruido = () => (Math.random() - 0.5) * 0.02;\nconst acelerometro = [];\nfor (let i = 0; i < 50; i++) {\n    const fase = (i / 50) * 2 * Math.PI * 4;\n    acelerometro.push([\n        Number(ruido().toFixed(3)),\n        Number(ruido().toFixed(3)),\n        Number((1 + c.amplitude * Math.sin(fase) + ruido()).toFixed(3))\n    ]);\n}\nmsg.topic = \"petcare360/sprint4/telemetria\";\nmsg.payload = {\n    petId: 61,\n    nome: \"Thor\",\n    especie: \"Cachorro\",\n    raca: \"Golden Retriever\",\n    idade: 4,\n    peso: 30.5,\n    temperatura: c.temperatura,\n    umidade: c.umidade,\n    alimentacao: c.alimentacao,\n    comportamento: c.comportamento,\n    acelerometro,\n    origem: \"coleira-mqtt\",\n    timestamp: new Date().toISOString()\n};\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 380,
+    "y": 340,
+    "wires": [
+      [
+        "mqtt_out"
+      ]
+    ]
+  },
+  {
+    "id": "mqtt_out",
+    "type": "mqtt out",
+    "z": "tab_petcare360",
+    "name": "Publicar telemetria",
+    "topic": "petcare360/sprint4/telemetria",
+    "qos": "1",
+    "retain": "",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "mqtt_hive",
+    "x": 620,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "form_pet",
+    "type": "ui_form",
+    "z": "tab_petcare360",
+    "name": "Formulário de avaliação",
+    "group": "ui_group_form",
+    "order": 1,
+    "width": 6,
+    "height": 10,
+    "options": [
+      {
+        "label": "ID do pet",
+        "value": "petId",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Nome",
+        "value": "nome",
+        "type": "text",
+        "required": false
+      },
+      {
+        "label": "Espécie (Cão/Gato)",
+        "value": "especie",
+        "type": "text",
+        "required": false
+      },
+      {
+        "label": "Raça",
+        "value": "raca",
+        "type": "text",
+        "required": false
+      },
+      {
+        "label": "Idade (anos)",
+        "value": "idade",
+        "type": "number",
+        "required": false
+      },
+      {
+        "label": "Peso (kg)",
+        "value": "peso",
+        "type": "number",
+        "required": false
+      },
+      {
+        "label": "Temperatura (°C)",
+        "value": "temperatura",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Umidade do ambiente (%)",
+        "value": "umidade",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Atividade (0-100)",
+        "value": "atividade",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Alimentação (0-100)",
+        "value": "alimentacao",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Comportamento alterado",
+        "value": "comportamentoAlterado",
+        "type": "switch",
+        "required": false
+      }
+    ],
+    "formValue": {
+      "petId": 61,
+      "nome": "Thor",
+      "especie": "Cão",
+      "raca": "Golden Retriever",
+      "idade": 4,
+      "peso": 30.5,
+      "temperatura": "",
+      "umidade": "",
+      "atividade": "",
+      "alimentacao": "",
+      "comportamentoAlterado": false
+    },
+    "payload": "",
+    "submit": "Analisar",
+    "cancel": "Limpar",
+    "topic": "",
+    "topicType": "str",
+    "splitLayout": false,
+    "className": "",
+    "x": 150,
+    "y": 460,
+    "wires": [
+      [
+        "fn_form_request"
+      ]
+    ]
+  },
+  {
+    "id": "fn_form_request",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "Aplicação - enviar para API REST",
+    "func": "const d = msg.payload || {};\nconst numero = v => (v === \"\" || v === null || v === undefined) ? undefined : Number(v);\nconst texto = v => (v === \"\" || v === null || v === undefined) ? undefined : String(v);\nmsg.payload = {\n    petId: numero(d.petId),\n    nome: texto(d.nome),\n    especie: texto(d.especie),\n    raca: texto(d.raca),\n    idade: numero(d.idade),\n    peso: numero(d.peso),\n    temperatura: numero(d.temperatura),\n    umidade: numero(d.umidade),\n    atividade: numero(d.atividade),\n    alimentacao: numero(d.alimentacao),\n    comportamento: d.comportamentoAlterado ? \"Alterado\" : \"Normal\",\n    origem: \"dashboard\"\n};\nmsg.method = \"POST\";\nmsg.url = env.get(\"PETCARE360_API_URL\") || \"http://127.0.0.1:1880/api/ia/analisar\";\nmsg.headers = { \"content-type\": \"application/json\" };\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 400,
+    "y": 460,
+    "wires": [
+      [
+        "http_request_ia"
+      ]
+    ]
+  },
+  {
+    "id": "http_request_ia",
+    "type": "http request",
+    "z": "tab_petcare360",
+    "name": "Chamar API REST do Node-RED",
+    "method": "use",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 660,
+    "y": 460,
+    "wires": [
+      [
+        "debug_form"
+      ]
+    ]
+  },
+  {
+    "id": "debug_form",
+    "type": "debug",
+    "z": "tab_petcare360",
+    "name": "Resposta da API (formulário)",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload.analiseIA.nivel",
+    "targetType": "msg",
+    "statusVal": "payload.analiseIA.nivel",
+    "statusType": "msg",
+    "x": 920,
+    "y": 460,
+    "wires": []
+  },
+  {
+    "id": "fn_dashboard",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "Preparar dashboard",
+    "func": "const d = msg.payload || {};\nconst ia = d.analiseIA;\nconst t = d.telemetria;\nif (!ia || !t) {\n    return null;\n}\nconst p = d.perfil || {};\nconst meds = ia.medicamentosAtivos;\nconst medicamentos = meds === null || meds === undefined\n    ? \"Não consultado (Oracle não configurado)\"\n    : (meds.length ? meds.join(\", \") : \"Nenhum medicamento ativo\");\nconst atividade = t.origemAtividade === \"acelerometro\" ? `${t.atividade} (acelerômetro)` : t.atividade;\nreturn [\n    { payload: t.temperatura },\n    { payload: t.umidade },\n    { payload: t.atividade },\n    { payload: t.alimentacao },\n    { payload: `${d.nome} — ${d.especie}, ${d.raca}, ${d.idade ?? \"-\"} anos (${p.faixaEtaria || \"-\"})` },\n    { payload: ia.nivel },\n    { payload: ia.irp },\n    { payload: ia.recomendacao },\n    { payload: ia.motivos.join(\" • \") },\n    { payload: medicamentos },\n    { payload: `${ia.tendencia.status} — ${ia.tendencia.descricao}` }\n];",
+    "outputs": 11,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1330,
+    "y": 300,
+    "wires": [
+      [
+        "g_temp"
+      ],
+      [
+        "g_humidity"
+      ],
+      [
+        "g_activity"
+      ],
+      [
+        "g_food"
+      ],
+      [
+        "txt_pet"
+      ],
+      [
+        "txt_status"
+      ],
+      [
+        "g_priority"
+      ],
+      [
+        "txt_recommendation"
+      ],
+      [
+        "txt_reasons"
+      ],
+      [
+        "txt_meds"
+      ],
+      [
+        "txt_tendencia"
+      ]
+    ]
+  },
+  {
+    "id": "g_temp",
+    "type": "ui_gauge",
+    "z": "tab_petcare360",
+    "name": "Temperatura",
+    "group": "ui_group_monitor",
+    "order": 1,
+    "width": 3,
+    "height": 3,
+    "gtype": "gage",
+    "title": "Temperatura",
+    "label": "°C",
+    "format": "{{value}}",
+    "min": "35",
+    "max": "42",
+    "colors": [
+      "#00b500",
+      "#e6e600",
+      "#ca3838"
+    ],
+    "seg1": "39",
+    "seg2": "39.5",
+    "diff": false,
+    "className": "",
+    "x": 1600,
+    "y": 240,
+    "wires": []
+  },
+  {
+    "id": "g_humidity",
+    "type": "ui_gauge",
+    "z": "tab_petcare360",
+    "name": "Umidade",
+    "group": "ui_group_monitor",
+    "order": 2,
+    "width": 3,
+    "height": 3,
+    "gtype": "gage",
+    "title": "Umidade",
+    "label": "%",
+    "format": "{{value}}",
+    "min": 0,
+    "max": "100",
+    "colors": [
+      "#00b500",
+      "#e6e600",
+      "#ca3838"
+    ],
+    "seg1": "60",
+    "seg2": "80",
+    "diff": false,
+    "className": "",
+    "x": 1600,
+    "y": 280,
+    "wires": []
+  },
+  {
+    "id": "g_activity",
+    "type": "ui_gauge",
+    "z": "tab_petcare360",
+    "name": "Atividade",
+    "group": "ui_group_monitor",
+    "order": 3,
+    "width": 3,
+    "height": 3,
+    "gtype": "gage",
+    "title": "Atividade",
+    "label": "/ 100",
+    "format": "{{value}}",
+    "min": 0,
+    "max": "100",
+    "colors": [
+      "#ca3838",
+      "#e6e600",
+      "#00b500"
+    ],
+    "seg1": "30",
+    "seg2": "50",
+    "diff": false,
+    "className": "",
+    "x": 1600,
+    "y": 320,
+    "wires": []
+  },
+  {
+    "id": "g_food",
+    "type": "ui_gauge",
+    "z": "tab_petcare360",
+    "name": "Alimentação",
+    "group": "ui_group_monitor",
+    "order": 4,
+    "width": 3,
+    "height": 3,
+    "gtype": "gage",
+    "title": "Alimentação",
+    "label": "/ 100",
+    "format": "{{value}}",
+    "min": 0,
+    "max": "100",
+    "colors": [
+      "#ca3838",
+      "#e6e600",
+      "#00b500"
+    ],
+    "seg1": "40",
+    "seg2": "60",
+    "diff": false,
+    "className": "",
+    "x": 1600,
+    "y": 360,
+    "wires": []
+  },
+  {
+    "id": "txt_pet",
+    "type": "ui_text",
+    "z": "tab_petcare360",
+    "group": "ui_group_ia",
+    "order": 1,
+    "width": 6,
+    "height": 2,
+    "name": "Pet",
+    "label": "Pet",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1590,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "id": "txt_status",
+    "type": "ui_text",
+    "z": "tab_petcare360",
+    "group": "ui_group_ia",
+    "order": 2,
+    "width": 6,
+    "height": 1,
+    "name": "Classificação",
+    "label": "Classificação da IA",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1600,
+    "y": 440,
+    "wires": []
+  },
+  {
+    "id": "g_priority",
+    "type": "ui_gauge",
+    "z": "tab_petcare360",
+    "name": "IRP",
+    "group": "ui_group_ia",
+    "order": 3,
+    "width": 6,
+    "height": 3,
+    "gtype": "gage",
+    "title": "IRP",
+    "label": "/ 10",
+    "format": "{{value}}",
+    "min": 0,
+    "max": "10",
+    "colors": [
+      "#00b500",
+      "#e6e600",
+      "#ca3838"
+    ],
+    "seg1": "3",
+    "seg2": "6",
+    "diff": false,
+    "className": "",
+    "x": 1590,
+    "y": 480,
+    "wires": []
+  },
+  {
+    "id": "txt_recommendation",
+    "type": "ui_text",
+    "z": "tab_petcare360",
+    "group": "ui_group_ia",
+    "order": 4,
+    "width": 6,
+    "height": 5,
+    "name": "Recomendação",
+    "label": "Recomendação personalizada",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1610,
+    "y": 520,
+    "wires": []
+  },
+  {
+    "id": "txt_reasons",
+    "type": "ui_text",
+    "z": "tab_petcare360",
+    "group": "ui_group_ia",
+    "order": 5,
+    "width": 6,
+    "height": 5,
+    "name": "Motivos",
+    "label": "Fatores considerados",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1600,
+    "y": 560,
+    "wires": []
+  },
+  {
+    "id": "txt_meds",
+    "type": "ui_text",
+    "z": "tab_petcare360",
+    "group": "ui_group_ia",
+    "order": 6,
+    "width": 6,
+    "height": 2,
+    "name": "Medicamentos",
+    "label": "Medicamentos ativos (Oracle)",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1610,
+    "y": 600,
+    "wires": []
+  },
+  {
+    "id": "txt_tendencia",
+    "type": "ui_text",
+    "z": "tab_petcare360",
+    "group": "ui_group_hist",
+    "order": 2,
+    "width": 6,
+    "height": 2,
+    "name": "Tendência",
+    "label": "Tendência do pet",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1600,
+    "y": 640,
+    "wires": []
+  },
+  {
+    "id": "fn_alert",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "Alertas inteligentes",
+    "func": "const d = msg.payload || {};\nconst ia = d.analiseIA;\nif (!ia) {\n    return null;\n}\nconst nome = d.nome || \"Pet\";\nif (ia.nivel === \"ALTO\") {\n    return { payload: `⚠️ PRIORIDADE ALTA — ${nome}: alerta registrado para o tutor e a clínica.` };\n}\nif (ia.nivel === \"ATENÇÃO\") {\n    return { payload: `🔶 ATENÇÃO — ${nome}: acompanhar indicadores nas próximas horas.` };\n}\nreturn { payload: `✅ ${nome}: sem alertas no momento.` };",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1320,
+    "y": 700,
+    "wires": [
+      [
+        "txt_alert",
+        "debug_alert"
+      ]
+    ]
+  },
+  {
+    "id": "txt_alert",
+    "type": "ui_text",
+    "z": "tab_petcare360",
+    "group": "ui_group_ia",
+    "order": 7,
+    "width": 6,
+    "height": 2,
+    "name": "Alerta",
+    "label": "Alerta",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1590,
+    "y": 700,
+    "wires": []
+  },
+  {
+    "id": "debug_alert",
+    "type": "debug",
+    "z": "tab_petcare360",
+    "name": "Alerta",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1590,
+    "y": 740,
+    "wires": []
+  },
+  {
+    "id": "dd_pet",
+    "type": "ui_dropdown",
+    "z": "tab_petcare360",
+    "name": "Selecionar pet",
+    "label": "Pet",
+    "tooltip": "",
+    "place": "Escolha um pet",
+    "group": "ui_group_hist",
+    "order": 1,
+    "width": 6,
+    "height": 1,
+    "passthru": false,
+    "multiple": false,
+    "options": [
+      {
+        "label": "Thor (61)",
+        "value": 61,
+        "type": "num"
+      },
+      {
+        "label": "Rex (1)",
+        "value": 1,
+        "type": "num"
+      },
+      {
+        "label": "Rex (25)",
+        "value": 25,
+        "type": "num"
+      },
+      {
+        "label": "Loro (27)",
+        "value": 27,
+        "type": "num"
+      },
+      {
+        "label": "Rex (42)",
+        "value": 42,
+        "type": "num"
+      },
+      {
+        "label": "Thorzinho (81)",
+        "value": 81,
+        "type": "num"
+      },
+      {
+        "label": "Pipoca (101)",
+        "value": 101,
+        "type": "num"
+      }
+    ],
+    "payload": "",
+    "topic": "",
+    "topicType": "str",
+    "className": "",
+    "x": 1100,
+    "y": 800,
+    "wires": [
+      [
+        "fn_hist_request"
+      ]
+    ]
+  },
+  {
+    "id": "fn_hist_request",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "Buscar histórico do pet",
+    "func": "const pets = { 1: \"Rex\", 25: \"Rex\", 27: \"Loro\", 42: \"Rex\", 61: \"Thor\", 81: \"Thorzinho\", 101: \"Pipoca\" };\nconst analise = typeof msg.payload === \"object\" && msg.payload !== null ? msg.payload : null;\nconst petId = analise ? analise.petId : Number(msg.payload);\nif (!petId) {\n    return null;\n}\nconst base = env.get(\"PETCARE360_AI_BASE_URL\") || \"http://127.0.0.1:8000\";\nreturn {\n    url: `${base}/api/ia/pets/${petId}/historico?limite=20`,\n    method: \"GET\",\n    nomePet: (analise && analise.nome) || pets[petId] || `Pet ${petId}`\n};",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1340,
+    "y": 800,
+    "wires": [
+      [
+        "http_hist"
+      ]
+    ]
+  },
+  {
+    "id": "http_hist",
+    "type": "http request",
+    "z": "tab_petcare360",
+    "name": "GET histórico",
+    "method": "use",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 1560,
+    "y": 800,
+    "wires": [
+      [
+        "fn_hist_chart"
+      ]
+    ]
+  },
+  {
+    "id": "fn_hist_chart",
+    "type": "function",
+    "z": "tab_petcare360",
+    "name": "Montar gráfico do histórico",
+    "func": "const h = msg.payload || {};\nconst analises = Array.isArray(h.analises) ? h.analises : [];\nconst r = h.resumo || {};\nconst pontos = analises.map(a => ({ x: new Date(a.dataAnalise).getTime(), y: a.irp }));\nconst resumo = r.totalAnalises\n    ? `${msg.nomePet}: ${r.totalAnalises} análises • IRP médio ${r.mediaIrp} • último nível ${r.ultimoNivel}`\n    : `${msg.nomePet}: nenhuma análise registrada ainda.`;\nreturn [\n    { payload: [{ series: [msg.nomePet], data: [pontos], labels: [\"\"] }] },\n    { payload: resumo }\n];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1780,
+    "y": 800,
+    "wires": [
+      [
+        "chart_irp"
+      ],
+      [
+        "txt_hist_resumo"
+      ]
+    ]
+  },
+  {
+    "id": "chart_irp",
+    "type": "ui_chart",
+    "z": "tab_petcare360",
+    "name": "IRP ao longo do tempo",
+    "group": "ui_group_hist",
+    "order": 3,
+    "width": 6,
+    "height": 5,
+    "label": "IRP ao longo do tempo",
+    "chartType": "line",
+    "legend": "true",
+    "xformat": "dd HH:mm",
+    "interpolate": "linear",
+    "nodata": "Sem histórico",
+    "dot": true,
+    "ymin": "0",
+    "ymax": "10",
+    "removeOlder": "30",
+    "removeOlderPoints": "",
+    "removeOlderUnit": "86400",
+    "cutout": 0,
+    "useOneColor": false,
+    "useUTC": false,
+    "colors": [
+      "#1f77b4",
+      "#aec7e8",
+      "#ff7f0e",
+      "#2ca02c",
+      "#98df8a",
+      "#d62728",
+      "#ff9896",
+      "#9467bd",
+      "#c5b0d5"
+    ],
+    "outputs": 1,
+    "useDifferentColor": false,
+    "className": "",
+    "x": 2020,
+    "y": 780,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "txt_hist_resumo",
+    "type": "ui_text",
+    "z": "tab_petcare360",
+    "group": "ui_group_hist",
+    "order": 4,
+    "width": 6,
+    "height": 1,
+    "name": "Resumo do histórico",
+    "label": "Resumo",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 2020,
+    "y": 840,
+    "wires": []
+  }
+]
