@@ -1,93 +1,204 @@
-# PetCare360 — Sprint 4
+# PetCare360 — Sprint 4 (Disruptive Architectures: IoT, IoB & Generative IA)
 
-Projeto de demonstração de acompanhamento contínuo de pets com Node-RED, MQTT, API REST e serviço de IA em Python. O Random Forest e o IRP foram incluídos como protótipo acadêmico usando dados sintéticos; **não é um sistema clínico validado**.
+Solução de acompanhamento contínuo da saúde de pets para a **CLYVO VET**. Uma coleira (simulada) envia telemetria por MQTT, o Node-RED expõe uma API REST e um dashboard, e um serviço de IA em Python classifica a prioridade de cada leitura, calcula o **IRP (Índice de Risco/Prioridade)**, personaliza a recomendação com os dados do pet no Oracle e compara a leitura com o histórico do próprio animal.
 
-## Conteúdo
-- `PetCare360_3Sprint.json`: fluxo Node-RED atualizado para chamar o serviço Python.
-- `ai_service/`: API FastAPI, Random Forest, cálculo do IRP, índice de atividade e consulta opcional a Oracle.
-- `ARQUITETURA.md`: fluxo e configurações.
-- `COMPONENTE_IA.md`: dados, algoritmo, fórmula do IRP, cálculo de atividade e limitações.
-- `MATRIZ_REQUISITOS.md`: rastreabilidade dos itens da Sprint 4.
-- `ROTEIRO_PITCH.md`: roteiro de apresentação de aproximadamente 5 minutos.
-- `sql/`: SQL de referência do banco entregue na Sprint 3.
-- `tests/`: testes unitários básicos.
+O serviço usa o **mesmo banco Oracle da API .NET e do app mobile do PetCare360**: lê pets e medicamentos das tabelas que o app já alimenta e grava cada análise da IA ligada ao pet.
 
-## Requisitos
-- Python 3.10 ou superior.
-- Node-RED.
-- Pacote `node-red-dashboard` para o dashboard legado.
-- Broker MQTT acessível, se quiser demonstrar a parte IoT.
-- Oracle é opcional para executar a API; é necessário para consultar medicação contínua diretamente da tabela `TB_MEDICAMENTO`.
+> Protótipo acadêmico. O modelo é treinado com dados sintéticos e **não substitui avaliação de um médico-veterinário**.
 
-## 1. Executar a IA
-No terminal, a partir da pasta `PetCare360_Sprint4`:
+## Integrantes — 2TDSPW
+
+| Nome | RM |
+|---|---|
+| João Vitor Lacerda | RM565565 |
+| Kauan Vieira de Lima | RM565403 |
+| Murillo Fernandes Carapia | RM564969 |
+| Pedro de Matos Previtali | RM564184 |
+
+## Links
+
+- Vídeo pitch (YouTube, não listado): _adicionar link_
+- Repositório: _adicionar link_
+
+## Problema e solução de IA
+
+Entre uma consulta e outra, o tutor não tem como saber se uma mudança de comportamento, apetite ou temperatura do pet merece atenção. A clínica, por sua vez, não sabe quais pacientes priorizar.
+
+A IA do PetCare360 resolve isso em quatro etapas a cada leitura:
+
+1. **Classificação** com `RandomForestClassifier` em três níveis: `NORMAL`, `ATENÇÃO` e `ALTO`.
+2. **IRP de 0 a 10**, derivado das probabilidades do modelo, para ordenar e visualizar a prioridade.
+3. **Personalização**: espécie e idade do pet (de `TB_PET`) entram no modelo, e os medicamentos em uso (de `TB_MEDICAMENTO`) entram na recomendação.
+4. **Acompanhamento contínuo**: cada análise é gravada em `TB_ANALISE_IA` e comparada com as últimas análises do mesmo pet, indicando piora, melhora ou estabilidade.
+
+Detalhes do modelo, dados e fórmulas em [`docs/COMPONENTE_IA.md`](docs/COMPONENTE_IA.md).
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+  C[Coleira IoT simulada] -- MQTT --> NR[Node-RED]
+  T[Tutor / Clínica] --> D[Dashboard Node-RED]
+  D --> API[API REST Node-RED]
+  NR --> IA[Serviço de IA - FastAPI]
+  API --> IA
+  IA <--> ORA[(Oracle PetCare360)]
+  APP[API .NET / App mobile] <--> ORA
+  IA --> NR
+  NR --> D
+```
+
+Fluxo completo, tabelas e variáveis de ambiente em [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md).
+
+## Tecnologias
+
+- Python 3.10+, FastAPI, Uvicorn
+- scikit-learn (Random Forest), NumPy
+- Oracle Database (`python-oracledb`), com SQLite local como alternativa
+- Node-RED, `node-red-dashboard`, MQTT (HiveMQ público)
+- unittest + FastAPI TestClient
+
+## Estrutura do repositório
+
+```
+PetCare360_Sprint4/
+├── ai_service/
+│   ├── main.py              API FastAPI (endpoints)
+│   ├── modelo.py            Random Forest, IRP, acelerômetro, faixa etária
+│   ├── personalizacao.py    motivos, tendência e recomendação personalizada
+│   ├── repositorio.py       acesso ao Oracle (TB_PET, TB_MEDICAMENTO, TB_ANALISE_IA)
+│   ├── requirements.txt
+│   └── .env.example
+├── nodered/
+│   └── PetCare360_Sprint4.json
+├── sql/
+│   └── analise_ia_sprint4.sql
+├── tests/
+│   ├── test_api.py
+│   └── test_modelo.py
+├── docs/
+│   ├── ARQUITETURA.md
+│   ├── COMPONENTE_IA.md
+│   ├── ROTEIRO_PITCH.md
+│   └── evidencias/
+└── README.md
+```
+
+## Como executar
+
+### 1. Banco de dados
+
+O projeto usa o schema Oracle do PetCare360 já criado pelas migrations da API .NET (`TB_TUTOR`, `TB_PET`, `TB_MEDICAMENTO`, `TB_CONSULTA`, `TB_VACINA`...). Nenhuma tabela existente é alterada.
+
+No SQL Developer, execute apenas `sql/analise_ia_sprint4.sql` (F5). Ele:
+
+- cria a tabela `TB_ANALISE_IA`, com FK para `TB_PET`;
+- cadastra um medicamento contínuo ativo para o pet Thor (ID 61) em `TB_MEDICAMENTO`;
+- insere 5 análises anteriores do Thor para demonstrar o acompanhamento contínuo.
+
+### 2. Serviço de IA
+
+Na raiz do projeto:
 
 ```bash
 python -m venv .venv
-# Windows PowerShell:
 .venv\Scripts\Activate.ps1
-# Linux/macOS:
-# source .venv/bin/activate
 pip install -r ai_service/requirements.txt
+copy ai_service\.env.example ai_service\.env
 uvicorn ai_service.main:app --host 127.0.0.1 --port 8000
 ```
 
-Verifique `http://127.0.0.1:8000/health`. O campo `demo_accuracy` é calculado sobre dados sintéticos de teste e **não** é métrica clínica.
+No Linux/macOS use `source .venv/bin/activate` e `cp`. Antes de subir, preencha `ai_service/.env` com usuário, senha e DSN do Oracle.
 
-## 2. Importar o fluxo Node-RED
-1. Abra Node-RED no navegador.
-2. Menu → Import → selecione `PetCare360_3Sprint.json`.
-3. Instale `node-red-dashboard` caso os nós de dashboard não estejam disponíveis.
-4. Clique em Deploy.
-5. Abra `http://127.0.0.1:1880/ui`.
-6. O serviço de IA deve estar rodando na porta 8000 antes de analisar um pet.
+Confira em `http://127.0.0.1:8000/health` (o campo `persistencia` deve mostrar `oracle`) e use a documentação interativa em `http://127.0.0.1:8000/docs`.
 
-### Configurar endereços
-O fluxo usa por padrão:
-- API do Node-RED: `http://127.0.0.1:1880/api/ia/analisar`
-- Serviço Python: `http://127.0.0.1:8000/api/ia/analisar`
+### 3. Node-RED
 
-Para mudar o serviço Python, defina `PETCARE360_AI_URL` no ambiente do processo Node-RED. Para mudar a URL da API usada pelo formulário, defina `PETCARE360_API_URL`. Reinicie o Node-RED após alterar variáveis de ambiente. Evite `localhost` quando os componentes estiverem em containers diferentes: use o nome do serviço/rede correto.
+1. Instale o Node-RED (`npm install -g --unsafe-perm node-red`) e rode `node-red`.
+2. Instale o `node-red-dashboard` (Menu → Manage palette → Install).
+3. Menu → Import → selecione `nodered/PetCare360_Sprint4.json` → Deploy.
+4. Abra o dashboard em `http://127.0.0.1:1880/ui`.
 
-## 3. Testar a API
+### 4. Usando o dashboard
+
+- **Simulador IoT**: os botões Normal, Atenção e Alto publicam uma leitura da coleira do Thor no MQTT, com 50 amostras do acelerômetro.
+- **Avaliação manual**: o formulário envia os dados de qualquer pet para a API REST do Node-RED.
+- **Análise da IA**: classificação, IRP, recomendação personalizada, motivos, medicamentos ativos do Oracle e alerta.
+- **Acompanhamento contínuo**: tendência do pet e gráfico do IRP ao longo do tempo; o seletor carrega o histórico de qualquer pet cadastrado.
+
+## API
+
+| Método | Rota | Serviço | Descrição |
+|---|---|---|---|
+| POST | `/api/ia/analisar` | Node-RED :1880 | Porta de entrada da aplicação; encaminha para a IA e devolve a análise |
+| POST | `/api/ia/analisar` | IA :8000 | Classifica, calcula o IRP, personaliza e grava a análise |
+| GET | `/api/ia/pets/{id}/historico` | IA :8000 | Histórico de análises e resumo do pet |
+| GET | `/api/ia/modelo` | IA :8000 | Métricas, matriz de confusão e importância das features |
+| GET | `/health` | IA :8000 | Status do serviço e banco em uso |
+
+Exemplo:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/ia/analisar \
+curl -X POST http://127.0.0.1:1880/api/ia/analisar \
   -H "Content-Type: application/json" \
-  -d '{"petId":1,"nome":"Rex","especie":"Cão","raca":"Labrador","idade":5,"peso":28,"temperatura":39.8,"umidade":55,"atividade":20,"alimentacao":35,"comportamento":"Alterado"}'
+  -d '{"petId":61,"temperatura":39.8,"umidade":72,"atividade":20,"alimentacao":35,"comportamento":"Alterado"}'
 ```
 
-A resposta contém `analiseIA.nivel`, `analiseIA.prioridade`/`irp`, probabilidades, motivos e recomendação.
-
-### Dados de acelerômetro
-A API também aceita `acelerometro` como uma lista de amostras XYZ em g. Exemplo reduzido:
+Resposta resumida:
 
 ```json
-{"temperatura":38.3,"alimentacao":90,"comportamento":"Normal","acelerometro":[[0,0,1],[0.02,0,1],[0,0.03,1],[0,0,0.98]]}
+{
+  "idAnalise": 6,
+  "persistencia": "oracle",
+  "nome": "Thor",
+  "perfil": { "especie": "Cão", "raca": "Golden Retriever", "idade": 4, "faixaEtaria": "adulto", "fonte": "banco" },
+  "telemetria": { "temperatura": 39.8, "atividade": 20, "origemAtividade": "informada" },
+  "analiseIA": {
+    "nivel": "ALTO",
+    "irp": 10,
+    "probabilidades": { "NORMAL": 0.0, "ATENÇÃO": 0.013, "ALTO": 0.987 },
+    "motivos": ["Temperatura bem acima da faixa de referência usada no protótipo", "..."],
+    "recomendacoesPersonalizadas": ["Há medicamento em uso registrado (Condroprotetor): ..."],
+    "medicamentosAtivos": ["Condroprotetor"],
+    "tendencia": { "status": "PIORA", "variacoes": { "temperatura": 1.36, "atividade": -55.6 } }
+  }
+}
 ```
 
-Na demonstração do dashboard, o campo `atividade` continua sendo um percentual de entrada; só é calculado a partir do acelerômetro quando a API recebe amostras XYZ.
+Em vez de `atividade`, a requisição pode trazer `acelerometro` com amostras `[x, y, z]` em g; o índice de atividade é calculado pelo serviço.
 
-## 4. Oracle opcional para medicação
-Configure `ORACLE_USER`, `ORACLE_PASSWORD` e `ORACLE_DSN` no ambiente do serviço Python. A consulta usa a tabela `TB_MEDICAMENTO` já existente no esquema da Sprint 3 e verifica se `DT_INICIO <= SYSDATE` e `DT_FIM` é nula ou futura. Nunca comite credenciais. Se Oracle não estiver configurado ou houver erro na consulta, o retorno será `medicamentoAtivoNoBanco: null`, que significa desconhecido — não significa que o pet não toma medicamento.
-
-## 5. Testes
-Com dependências instaladas, execute na raiz:
+## Testes
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-## Limitações importantes
-- O Random Forest é treinado com exemplos sintéticos gerados pelo código. A pontuação/acurácia de demonstração não pode ser interpretada como validação em animais reais.
-- O mapeamento do acelerômetro é provisório e precisa ser calibrado com hardware real.
-- A persistência automática de cada análise no Oracle não está implementada; o serviço consulta a tabela de medicamentos, mas não grava o resultado da análise.
-- O sistema não diagnostica, não prescreve e não substitui um médico-veterinário.
+São 21 testes cobrindo fórmula do IRP, cálculo de atividade pelo acelerômetro, faixa etária, métricas mínimas do modelo, detecção de tendência, os três cenários de uso pela API, validação de entrada, personalização para pet idoso e persistência com histórico. Os testes usam um SQLite temporário e não alteram o Oracle.
 
-## Checklist para entrega
-- [ ] Importar e executar o fluxo Node-RED.
-- [ ] Subir o serviço Python e confirmar `/health`.
-- [ ] Testar os três níveis e registrar evidências reais do dashboard/API.
-- [ ] Gravar o pitch, publicar como não listado e inserir o link no pacote final.
-- [ ] Publicar o repositório GitHub com este README e os arquivos do projeto.
-- [ ] Substituir ou completar os campos de integrantes/turma, se exigido pela disciplina.
+## Resultados
+
+Métricas do Random Forest sobre a base sintética (600 amostras de teste):
+
+| Métrica | Valor |
+|---|---|
+| Acurácia (teste) | 0,898 |
+| Validação cruzada 5 folds | 0,893 ± 0,014 |
+| F1 NORMAL / ATENÇÃO / ALTO | 0,906 / 0,878 / 0,918 |
+
+Importância das features: temperatura 0,36 · alimentação 0,29 · atividade 0,26 · faixa etária 0,06 · comportamento 0,04.
+
+Cenários de uso validados com o Thor (ID 61, cão adulto):
+
+| Cenário | Temperatura | Atividade | Alimentação | Comportamento | Nível | IRP |
+|---|---|---|---|---|---|---|
+| Normal | 38,3 °C | 78 | 90 | Normal | NORMAL | 0 |
+| Atenção | 39,3 °C | 40 | 50 | Alterado | ATENÇÃO | 6 |
+| Alto | 39,8 °C | 20 | 35 | Alterado | ALTO | 10 |
+
+Evidências do dashboard, da API e do banco estão em [`docs/evidencias`](docs/evidencias).
+
+## Limitações
+
+- A base de treino é sintética, gerada a partir de regras de triagem simplificadas com ruído de sensor. Não há validação com animais reais.
+- A calibração do acelerômetro (0,02–0,60 g → 0–100) é demonstrativa e precisa ser ajustada para o hardware real.
+- Limites e recomendações precisam de revisão de um médico-veterinário antes de uso real.
